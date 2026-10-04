@@ -6,3 +6,4 @@ common_base_packages:
   - zsh
   - ufw
   - zstd
+  - gh
