@@ -33,9 +33,43 @@
     state: present
   tags: [butler-deploy]
 
-- name: Create Butler checkout parents
+# ponytail: one-time move from old home checkouts; drop once every host is migrated.
+- name: Move legacy Butler checkouts to /srv
+  ansible.builtin.command: mv {{ item.src | quote }} {{ item.dest | quote }}
+  args:
+    removes: "{{ item.src }}"
+    creates: "{{ item.dest }}"
+  loop:
+    - { src: "/home/{{ agent_user }}/services/butler", dest: "{{ butler_dir }}" }
+  tags: [butler-deploy]
+
+- name: Check legacy Butler wiki link
+  ansible.builtin.stat:
+    path: "{{ wiki_dir }}"
+  register: butler_wiki_path
+  tags: [butler-deploy]
+
+- name: Remove legacy Butler wiki link
   ansible.builtin.file:
-    path: "{{ item | dirname }}"
+    path: "{{ wiki_dir }}"
+    state: absent
+  when: butler_wiki_path.stat.islnk | default(false)
+  tags: [butler-deploy]
+
+# ponytail: one-time move from old wiki locations; drop once every host is migrated.
+- name: Move legacy Butler wiki checkout
+  ansible.builtin.command: mv {{ item | quote }} {{ wiki_dir | quote }}
+  args:
+    removes: "{{ item }}"
+    creates: "{{ wiki_dir }}"
+  loop:
+    - /srv/second-brain-wiki
+    - "/home/{{ agent_user }}/services/second-brain-wiki"
+  tags: [butler-deploy]
+
+- name: Create Butler checkouts
+  ansible.builtin.file:
+    path: "{{ item }}"
     state: directory
     owner: "{{ agent_user }}"
     group: "{{ agent_user }}"
@@ -90,26 +124,16 @@
     mode: "0644"
   tags: [butler-deploy]
 
-- name: Check Butler wiki link
-  ansible.builtin.stat:
-    path: "{{ butler_data_dir }}/wiki"
-  register: butler_wiki_link
-  tags: [butler-deploy]
-
-- name: Reject non-link Butler wiki path
-  ansible.builtin.assert:
-    that: not butler_wiki_link.stat.exists or butler_wiki_link.stat.islnk
-    fail_msg: "{{ butler_data_dir }}/wiki exists and is not a symlink"
-  tags: [butler-deploy]
-
-- name: Link Butler wiki checkout
-  ansible.builtin.file:
-    src: "{{ wiki_dir }}"
-    dest: "{{ butler_data_dir }}/wiki"
-    state: link
+- name: Point librarian at Butler wiki
+  ansible.builtin.lineinfile:
+    path: "/home/{{ agent_user }}/.hermes/profiles/librarian/.env"
+    regexp: "^{{ item }}="
+    line: "{{ item }}={{ wiki_dir }}"
+    create: true
     owner: "{{ agent_user }}"
     group: "{{ agent_user }}"
-    force: true
+    mode: "0600"
+  loop: [OBSIDIAN_VAULT_PATH, WIKI_PATH]
   tags: [butler-deploy]
 
 - name: Render Butler runtime environment
