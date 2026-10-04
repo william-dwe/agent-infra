@@ -1,0 +1,12 @@
+# Local credentials and restore archives; never push.
+ansible/secret.txt
+ansible/backups/
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Ansible runtime artifacts
+*.retry
+.ansible/

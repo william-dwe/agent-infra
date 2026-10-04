@@ -1,0 +1,14 @@
+- name: Initialize personal-agent infrastructure
+  hosts: all
+  become: true
+  roles:
+    - role: common
+      tags: [common]
+    - role: tailscale
+      tags: [tailscale]
+    - role: hermes
+      tags: [hermes]
+    - role: devtools
+      tags: [devtools]
+    - role: dotenvx
+      tags: [dotenvx]
