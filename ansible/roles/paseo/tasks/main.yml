@@ -1,0 +1,60 @@
+- name: Require Node.js and npm
+  ansible.builtin.stat:
+    path: /usr/local/bin/npm
+  register: paseo_npm
+
+- name: Assert Node.js is installed
+  ansible.builtin.assert:
+    that: paseo_npm.stat.exists
+    fail_msg: "Run the devtools role first to install Node.js/npm"
+
+- name: Install pinned Paseo CLI
+  ansible.builtin.command: npm install --global --prefix /opt/paseo "@getpaseo/cli@{{ paseo_version }}"
+  args:
+    creates: /opt/paseo/bin/paseo
+  when: not ansible_check_mode
+
+- name: Read Tailscale IPv4 address
+  ansible.builtin.command: tailscale ip -4
+  register: paseo_tail_ip
+  changed_when: false
+  check_mode: false
+
+- name: Require a Tailscale IPv4 address
+  ansible.builtin.assert:
+    that: paseo_tail_ip.stdout is match('^100\\.[0-9]+\\.[0-9]+\\.[0-9]+$')
+    fail_msg: "Tailscale IPv4 unavailable; refusing network bind"
+
+- name: Create Paseo home
+  ansible.builtin.file:
+    path: "/home/{{ agent_user }}/.paseo"
+    state: directory
+    owner: "{{ agent_user }}"
+    group: "{{ agent_user }}"
+    mode: "0700"
+
+- name: Configure Paseo on Tailscale only
+  ansible.builtin.copy:
+    dest: "/home/{{ agent_user }}/.paseo/config.json"
+    content: "{{ {'version': 1, 'daemon': {'listen': paseo_tail_ip.stdout ~ ':6767', 'relay': {'enabled': false}}, 'features': {'webUi': {'enabled': true}}, 'agents': {'providers': {'hermes': {'extends': 'acp', 'label': 'Hermes', 'command': ['/home/' ~ agent_user ~ '/.local/bin/hermes', 'acp']}}}} | to_nice_json }}\n"
+    owner: "{{ agent_user }}"
+    group: "{{ agent_user }}"
+    mode: "0600"
+  notify: restart paseo
+
+- name: Install Paseo systemd unit
+  ansible.builtin.template:
+    src: paseo.service.j2
+    dest: /etc/systemd/system/paseo.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart paseo
+
+- name: Enable and start Paseo
+  ansible.builtin.systemd_service:
+    name: paseo.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode

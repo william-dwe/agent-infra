@@ -10,5 +10,7 @@
       tags: [hermes]
     - role: devtools
       tags: [devtools]
+    - role: paseo
+      tags: [paseo]
     - role: dotenvx
       tags: [dotenvx]

@@ -1,0 +1,18 @@
+[Unit]
+Description=Paseo coding-agent control plane
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+
+[Service]
+Type=simple
+User={{ agent_user }}
+Group={{ agent_user }}
+WorkingDirectory=/home/{{ agent_user }}
+Environment=HOME=/home/{{ agent_user }}
+Environment=PATH=/home/{{ agent_user }}/.local/bin:/opt/paseo/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/paseo/bin/paseo daemon run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
